@@ -35,7 +35,7 @@ bool decrypt_mibeacon45(const MiotListener *listener, MiBeacon &mib) {
     uint16_t product_id;
     uint32_t random_number;
   } PACKED nonce;
-  memcpy(nonce.mac, &listener->get_address(), sizeof(esp_bd_addr_t));
+  memcpy(nonce.mac, mac_reverse(listener->get_address()), sizeof(esp_bd_addr_t));
   nonce.product_id = mib.product_id;
   nonce.random_number = mib.random_number;
 
@@ -52,13 +52,12 @@ bool decrypt_mibeacon45(const MiotListener *listener, MiBeacon &mib) {
   if (ret != 0) {
     ESP_LOGW(TAG, "%12" PRIX64 " [%04X] mbedtls_ccm_auth_decrypt failed: %d", listener->get_address(),
              listener->get_product_id(), ret);
-    ESP_LOGW(TAG, "   mac: %02X:%02X:%02X:%02X:%02X:%02X", nonce.mac[5], nonce.mac[4], nonce.mac[3], nonce.mac[2],
-             nonce.mac[1], nonce.mac[0]);
-    ESP_LOGW(TAG, "   key: %s", hexencode(listener->get_bindkey(), sizeof(bindkey_t)).c_str());
-    ESP_LOGW(TAG, "    iv: %s", hexencode(iv, iv_len).c_str());
-    ESP_LOGW(TAG, "   add: %s", hexencode(add, add_len).c_str());
-    ESP_LOGW(TAG, "   tag: %s", hexencode(tag, tag_len).c_str());
-    ESP_LOGW(TAG, "  data: %s", hexencode(data, size).c_str());
+    ESP_LOGW(TAG, "   mac: " MIOT_ADDR_STR, MIOT_ADDR_HEX_REVERSE(nonce.mac));
+    ESP_LOGW(TAG, "   key: %s", format_hex_pretty(listener->get_bindkey(), sizeof(bindkey_t)).c_str());
+    ESP_LOGW(TAG, "    iv: %s", format_hex_pretty(iv, iv_len).c_str());
+    ESP_LOGW(TAG, "   add: %s", format_hex_pretty(add, add_len).c_str());
+    ESP_LOGW(TAG, "   tag: %s", format_hex_pretty(tag, tag_len).c_str());
+    ESP_LOGW(TAG, "  data: %s", format_hex_pretty(data, size).c_str());
     return false;
   }
 
@@ -114,10 +113,10 @@ bool decrypt_mibeacon23(const MiotListener *listener, MiBeacon &mib) {
   if (ret != 0) {
     ESP_LOGW(TAG, "%12" PRIX64 " [%04X] mbedtls_ccm_star_auth_decrypt failed: %d", listener->get_address(),
              listener->get_product_id(), ret);
-    ESP_LOGW(TAG, "   key: %s", hexencode(key, sizeof(bindkey_t)).c_str());  // legacy bindkey size is 12 bytes
-    ESP_LOGW(TAG, "    iv: %s", hexencode(iv, iv_len).c_str());
-    ESP_LOGW(TAG, "   add: %s", hexencode(add, add_len).c_str());
-    ESP_LOGW(TAG, "  data: %s", hexencode(data, size).c_str());
+    ESP_LOGW(TAG, "   key: %s", format_hex_pretty(key, sizeof(bindkey_t)).c_str());  // legacy bindkey size is 12 bytes
+    ESP_LOGW(TAG, "    iv: %s", format_hex_pretty(iv, iv_len).c_str());
+    ESP_LOGW(TAG, "   add: %s", format_hex_pretty(add, add_len).c_str());
+    ESP_LOGW(TAG, "  data: %s", format_hex_pretty(data, size).c_str());
     return false;
   }
 

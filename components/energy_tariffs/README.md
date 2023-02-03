@@ -2,6 +2,8 @@
 
 Adds tariff support to your energy meter.
 
+> You can take a look at sample of usage of Energy* components in configuartion for `ZMAi-90` energy meter based on `TYWE3S`: [zmai90.yaml](../zmai90.yaml)
+
 > Detailed description will be provided soon...
 
 ```yaml
@@ -13,7 +15,8 @@ external_components:
 - platform: "energy_tariffs"
     id: tariffs
     total: total
-    time_offset_service: time_offset_set
+    time_offset:
+      name: "$name Time Offset"
     tariffs:
       - name: "$name Peak Tariff"
         id: peak

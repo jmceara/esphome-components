@@ -1,6 +1,3 @@
-
-
-#ifdef ARDUINO_ARCH_ESP32
 #include "esphome/core/log.h"
 #include "mbedtls/ccm.h"
 #include "inttypes.h"
@@ -13,11 +10,6 @@ namespace miot {
 
 static const char *const TAG = "miot";
 
-#define ANSI_RED "\033[0;31m"
-#define ANSI_GREEN "\033[0;32m"
-#define ANSI_YELLOW "\033[0;33m"
-#define ANSI_WHITE "\033[0;37m"
-#define ANSI_CLEAR "\033[0m"
 // Unicode: U+2582, UTF-8: E2 96 82
 #define UNI_LOWER_ONE_QUARTER_BLOCK "\xe2\x96\x82"
 // Unicode: U+2584, UTF-8: E2 96 84
@@ -27,21 +19,17 @@ static const char *const TAG = "miot";
 // Unicode: U+2588, UTF-8: E2 96 88
 #define UNI_FULL_BLOCK "\xe2\x96\x88"
 
-const char *const get_signal_bars(int rssi) {
+static inline const char *get_signal_bars(int rssi) {
   if (rssi >= -50) {
-    return ANSI_GREEN UNI_LOWER_ONE_QUARTER_BLOCK UNI_LOWER_HALF_BLOCK UNI_LOWER_THREE_QUARTERS_BLOCK UNI_FULL_BLOCK
-        ANSI_CLEAR;
+    return "excellent";
   }
   if (rssi >= -65) {
-    return ANSI_YELLOW UNI_LOWER_ONE_QUARTER_BLOCK UNI_LOWER_HALF_BLOCK UNI_LOWER_THREE_QUARTERS_BLOCK ANSI_WHITE
-        UNI_FULL_BLOCK ANSI_CLEAR;
+    return "good";
   }
   if (rssi >= -85) {
-    return ANSI_YELLOW UNI_LOWER_ONE_QUARTER_BLOCK UNI_LOWER_HALF_BLOCK ANSI_WHITE UNI_LOWER_THREE_QUARTERS_BLOCK
-        UNI_FULL_BLOCK ANSI_CLEAR;
+    return "normal";
   }
-  return ANSI_RED UNI_LOWER_ONE_QUARTER_BLOCK ANSI_WHITE UNI_LOWER_HALF_BLOCK UNI_LOWER_THREE_QUARTERS_BLOCK
-      UNI_FULL_BLOCK ANSI_CLEAR;
+  return "poor";
 }
 
 bool MiBeaconTracker::parse_device(const esp32_ble_tracker::ESPBTDevice &device) {
@@ -57,21 +45,20 @@ bool MiBeaconTracker::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
 bool MiBeaconTracker::parse_mibeacon_(const esp32_ble_tracker::ESPBTDevice &device,
                                       const std::vector<uint8_t> &raw) const {
   if (raw.size() < sizeof(RawMiBeaconHeader)) {
-    ESP_LOGW("Invalid MiBeacon data length: %s", hexencode(raw).c_str());
+    ESP_LOGW(TAG, "Invalid MiBeacon data length: %s", format_hex_pretty(raw).c_str());
     return false;
   }
-
-  ESP_LOGD(TAG, "Got MiBeacon: %s", hexencode(raw).c_str());
 
   auto mib = MiBeacon(reinterpret_cast<const RawMiBeaconHeader *>(raw.data()));
 
   if (mib.frame_control.mesh) {
-    ESP_LOGW(TAG, "Device data is a mesh type device");
+    // ESP_LOGW(TAG, "Device data is a mesh type device: %s", format_hex_pretty(raw).c_str());
     return false;
   }
 
   if (mib.frame_control.version < 2) {
-    ESP_LOGW(TAG, "Device data is using old data format: %" PRIu8, mib.frame_control.version);
+    ESP_LOGW(TAG, "MiBeacon is using old data format %" PRIu8 ": %s", mib.frame_control.version,
+             format_hex_pretty(raw).c_str());
     return false;
   }
 
@@ -95,9 +82,15 @@ bool MiBeaconTracker::parse_mibeacon_(const esp32_ble_tracker::ESPBTDevice &devi
   BLEObject *encrypted_obj = nullptr;
   if (mib.frame_control.object_include) {
     if (mib.frame_control.is_encrypted) {
-      const uint8_t *mic = raw.data() + raw.size() - sizeof(uint32_t);
-      mib.message_integrity_check = *reinterpret_cast<const uint32_t *>(mic);
-
+      const uint8_t *end = raw.data() + raw.size();
+      const uint8_t *mic;
+      if (mib.frame_control.version > 3) {
+        mic = end - sizeof(uint32_t);
+        mib.message_integrity_check = *reinterpret_cast<const uint32_t *>(mic);
+      } else {
+        mic = end - sizeof(uint8_t);
+        mib.message_integrity_check = *reinterpret_cast<const uint8_t *>(mic);
+      }
       const uint8_t *rnd = mic - sizeof(uint32_t);
       // random_number combined with frame_counter to become a 4-byte Counter for anti-replay
       mib.random_number = ((*reinterpret_cast<const uint32_t *>(rnd)) & 0xFFFFFF00) | mib.frame_counter;
@@ -109,11 +102,11 @@ bool MiBeaconTracker::parse_mibeacon_(const esp32_ble_tracker::ESPBTDevice &devi
   }
 
   bool processed = false;
-  for (auto listener : listeners_) {
+  for (auto listener : this->listeners_) {
     if (device.address_uint64() != listener->get_address()) {
       continue;
     }
-    if (mib.frame_control.mac_include && device.address_uint64() != mib.mac_address) {
+    if (mib.has_address() && mib.mac_address != device.address_uint64()) {
       ESP_LOGW(TAG, "%12" PRIX64 " [%04X] MAC address doesn't match data MAC address %12" PRIX64,
                listener->get_address(), listener->get_product_id(), mib.mac_address);
       continue;
@@ -140,19 +133,29 @@ bool MiBeaconTracker::parse_mibeacon_(const esp32_ble_tracker::ESPBTDevice &devi
     }
   }
 
-  delete encrypted_obj;
-
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
   if (!processed) {
+    ESP_LOGD(TAG, "Got MiBeacon: %s", format_hex_pretty(raw).c_str());
     const int rssi = device.get_rssi();
-    ESP_LOGD(TAG, "  %s [%04X]%s %s RSSI=%d %s", device.get_name().c_str(), mib.product_id,
-             mib.frame_control.is_encrypted ? " (encrypted)" : "", device.address_str().c_str(), rssi,
-             get_signal_bars(rssi));
-    if (!mib.frame_control.is_encrypted && mib.frame_control.object_include) {
-      ESP_LOGD(TAG, "  Object:");
-      ESP_LOGD(TAG, "    ID  : %04X", mib.object.id);
-      ESP_LOGD(TAG, "    data: %s", hexencode(mib.object.data.data(), mib.object.data.size()).c_str());
+    ESP_LOGD(TAG, "  %s [%04X]%s %s RSSI=%d (%s)", device.get_name().c_str(), mib.product_id,
+             mib.is_encrypted() ? " (encrypted)" : "", device.address_str().c_str(), rssi, get_signal_bars(rssi));
+    if (mib.has_object()) {
+      BLEObject *obj = nullptr;
+      if (encrypted_obj != nullptr) {
+        obj = encrypted_obj;
+      } else if (!mib.is_encrypted()) {
+        obj = &mib.object;
+      }
+      if (obj != nullptr) {
+        ESP_LOGD(TAG, "  Object:");
+        ESP_LOGD(TAG, "    ID  : %04X", obj->id);
+        ESP_LOGD(TAG, "    data: %s", format_hex_pretty(obj->data.data(), obj->data.size()).c_str());
+      }
     }
   }
+#endif
+
+  delete encrypted_obj;
 
   return true;
 }
@@ -169,19 +172,13 @@ bool MiotListener::process_mibeacon(const MiBeacon &mib) {
   }
   this->frame_counter_ = mib.frame_counter;
 
-  if (!mib.frame_control.object_include) {
+  if (!mib.has_object()) {
     return false;
   }
 
-  ESP_LOGD(TAG, "%12" PRIX64 " [%04X] Got BLEObject: ID: %04X, data: %s", this->address_, this->get_product_id(),
-           mib.object.id, hexencode(mib.object.data).c_str());
+  ESP_LOGV(TAG, "%12" PRIX64 " [%04X] Got BLEObject: ID: %04X, data: %s", this->address_, this->get_product_id(),
+           mib.object.id, format_hex_pretty(mib.object.data).c_str());
   return this->process_object_(mib.object);
-}
-
-bool MiotListener::process_unhandled_(const miot::BLEObject &obj) {
-  ESP_LOGW(TAG, "%12" PRIX64 " [%04X] Unhandled object attribute: %04X, value: %s", this->address_,
-           this->get_product_id(), obj.id, hexencode(obj.data).c_str());
-  return false;
 }
 
 bool MiotListener::have_bindkey() const {
@@ -193,13 +190,53 @@ bool MiotListener::have_bindkey() const {
   return false;
 }
 
+bool MiotListener::process_unhandled_(const miot::BLEObject &obj) {
+  std::string s;
+  if (obj.data.size() == 1) {
+    s = str_sprintf("%u (0x%x)", obj.data[0], obj.data[0]);
+  } else {
+    s = format_hex_pretty(obj.data);
+  }
+  ESP_LOGW(TAG, "%12" PRIX64 " [%04X] Unhandled object attribute: %04X, value: %s", this->address_,
+           this->get_product_id(), obj.id, s.c_str());
+  return false;
+}
+
+// Convert battery level to voltage.
+float battery_to_voltage(uint32_t battery_level) {
+  // 2200 mV - 0%
+  const uint32_t min_voltage = 2200;
+  // 3100 mV - 100%
+  const uint32_t max_voltage = 3100;
+  return (min_voltage + (max_voltage - min_voltage) / 100 * battery_level) * 0.001f;
+}
+
 bool MiotComponent::process_default_(const miot::BLEObject &obj) {
   switch (obj.id) {
     case MIID_BATTERY: {
-      if (this->battery_level_) {
+      if (this->battery_level_ || this->battery_voltage_) {
         auto battery_level = obj.get_battery_level();
         if (battery_level.has_value()) {
-          this->battery_level_->publish_state(*battery_level);
+          if (this->battery_level_) {
+            this->battery_level_->publish_state(*battery_level);
+          }
+          if (this->battery_voltage_) {
+            this->battery_voltage_->publish_state(battery_to_voltage(*battery_level));
+          }
+        }
+      }
+      break;
+    }
+    case MIID_MIAOMIAOCE_BATTERY_1003: {
+      if (this->battery_level_ || this->battery_voltage_) {
+        auto battery_level = obj.get_miaomiaoce_battery_level_1003();
+        if (battery_level.has_value()) {
+          if (this->battery_level_) {
+            this->battery_level_->publish_state(*battery_level);
+          }
+          if (this->battery_voltage_) {
+            this->battery_voltage_->publish_state(battery_to_voltage(*battery_level));
+          }
         }
       }
       break;
@@ -212,14 +249,14 @@ bool MiotComponent::process_default_(const miot::BLEObject &obj) {
 
 void MiotComponent::dump_config_(const char *TAG) const {
   ESP_LOGCONFIG(TAG, "Xiaomi %s", this->get_product_code());
-  const uint8_t *mac = reinterpret_cast<const uint8_t *>(&this->address_);
-  ESP_LOGCONFIG(TAG, "  MAC: %02X:%02X:%02X:%02X:%02X:%02X", mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
+  const uint8_t *mac = mac_reverse(this->address_);
+  ESP_LOGCONFIG(TAG, "  MAC: " MIOT_ADDR_STR, MIOT_ADDR_HEX_REVERSE(mac));
   if (this->have_bindkey()) {
-    ESP_LOGCONFIG(TAG, "  Bindkey: %s", hexencode(this->bindkey_, sizeof(bindkey_t)).c_str());
+    ESP_LOGCONFIG(TAG, "  Bindkey: %s", format_hex_pretty(this->bindkey_, sizeof(bindkey_t)).c_str());
   }
   LOG_SENSOR("  ", "Battery Level", this->battery_level_);
+  LOG_SENSOR("  ", "Battery Voltage", this->battery_voltage_);
 }
 
 }  // namespace miot
 }  // namespace esphome
-#endif

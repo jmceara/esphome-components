@@ -1,15 +1,21 @@
 #pragma once
-#ifdef ARDUINO_ARCH_ESP32
+
 #include <functional>
 #include <vector>
+
 #include "esphome/core/component.h"
 #include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
 #include "esphome/components/sensor/sensor.h"
+
 #include "miot_spec.h"
 #include "miot_object.h"
+#include "miot_utils.h"
 
 namespace esphome {
 namespace miot {
+
+#define MIOT_ADDR_STR ESP_BD_ADDR_STR
+#define MIOT_ADDR_HEX_REVERSE(addr) addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]
 
 using bindkey_t = uint8_t[16];
 
@@ -26,6 +32,14 @@ struct MiBeacon {
   BLEObject object = {};
   uint32_t random_number = {};
   uint32_t message_integrity_check = {};
+  uint8_t version() const { return frame_control.version; }
+  bool has_object() const { return frame_control.object_include; }
+  bool has_address() const { return frame_control.mac_include; }
+  bool has_capability() const { return frame_control.capability_include; }
+  bool has_io_capability() const { return has_capability() && capability.io; }
+  bool is_mesh() const { return frame_control.mesh; }
+  bool is_registered() const { return frame_control.registered; }
+  bool is_encrypted() const { return frame_control.is_encrypted; }
 };
 
 class MiotListener;
@@ -48,14 +62,11 @@ class MiotListener {
 
   const uint8_t *get_bindkey() const { return this->bindkey_; }
   void set_bindkey(const bindkey_t bindkey) { memcpy(this->bindkey_, bindkey, sizeof(bindkey_t)); }
+  bool have_bindkey() const;
 
   virtual uint16_t get_product_id() const = 0;
 
-  bool get_frame_counter() const;
-  void set_frame_counter(uint8_t frame_counter) { this->frame_counter_ = frame_counter; }
-
   virtual bool process_mibeacon(const MiBeacon &mib);
-  bool have_bindkey() const;
 
  protected:
   uint64_t address_ = {};
@@ -72,9 +83,11 @@ class MiotComponent : public Component, public MiotListener {
 
   virtual const char *get_product_code() const = 0;
   void set_battery_level(sensor::Sensor *battery_level) { this->battery_level_ = battery_level; }
+  void set_battery_voltage(sensor::Sensor *battery_voltage) { this->battery_voltage_ = battery_voltage; }
 
  protected:
-  sensor::Sensor *battery_level_{nullptr};
+  sensor::Sensor *battery_level_{};
+  sensor::Sensor *battery_voltage_{};
 
   void dump_config_(const char *TAG) const;
 
@@ -83,4 +96,3 @@ class MiotComponent : public Component, public MiotListener {
 
 }  // namespace miot
 }  // namespace esphome
-#endif

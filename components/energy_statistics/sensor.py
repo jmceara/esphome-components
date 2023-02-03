@@ -7,7 +7,7 @@ from esphome.const import (
     CONF_POWER,
     CONF_TOTAL,
     DEVICE_CLASS_ENERGY,
-    ICON_FLASH,
+    STATE_CLASS_TOTAL_INCREASING,
     UNIT_KILOWATT_HOURS,
 )
 
@@ -30,22 +30,35 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
         cv.Required(CONF_TOTAL): cv.use_id(sensor.Sensor),
         cv.Optional(CONF_ENERGY_TODAY): sensor.sensor_schema(
-            UNIT_KILOWATT_HOURS, ICON_FLASH, 2, DEVICE_CLASS_ENERGY
+            unit_of_measurement=UNIT_KILOWATT_HOURS,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_ENERGY,
+            state_class=STATE_CLASS_TOTAL_INCREASING,
         ),
         cv.Optional(CONF_ENERGY_YESTERDAY): sensor.sensor_schema(
-            UNIT_KILOWATT_HOURS, ICON_FLASH, 2, DEVICE_CLASS_ENERGY
+            unit_of_measurement=UNIT_KILOWATT_HOURS,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_ENERGY,
+            state_class=STATE_CLASS_TOTAL_INCREASING,
         ),
         cv.Optional(CONF_ENERGY_WEEK): sensor.sensor_schema(
-            UNIT_KILOWATT_HOURS, ICON_FLASH, 2, DEVICE_CLASS_ENERGY
+            unit_of_measurement=UNIT_KILOWATT_HOURS,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_ENERGY,
+            state_class=STATE_CLASS_TOTAL_INCREASING,
         ),
         cv.Optional(CONF_ENERGY_MONTH): sensor.sensor_schema(
-            UNIT_KILOWATT_HOURS, ICON_FLASH, 2, DEVICE_CLASS_ENERGY
+            unit_of_measurement=UNIT_KILOWATT_HOURS,
+            accuracy_decimals=2,
+            device_class=DEVICE_CLASS_ENERGY,
+            state_class=STATE_CLASS_TOTAL_INCREASING,
         ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
 
 async def setup_sensor(config, key, setter):
+    """setting up sensor"""
     if key not in config:
         return None
     var = await sensor.new_sensor(config[key])
@@ -54,6 +67,7 @@ async def setup_sensor(config, key, setter):
 
 
 async def setup_input(config, key, setter):
+    """setting up input"""
     if key not in config:
         return None
     var = await cg.get_variable(config[key])
@@ -63,6 +77,7 @@ async def setup_input(config, key, setter):
 
 # code generation entry point
 async def to_code(config):
+    """Code generation entry point"""
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 

@@ -1,4 +1,3 @@
-from esphome.components.ble_client import switch
 import logging
 from esphome import core, pins
 import esphome.codegen as cg
@@ -9,13 +8,16 @@ from esphome.components import binary_sensor, sensor, uart, switch
 from esphome.const import (
     CONF_ACTIVE_POWER,
     CONF_APPARENT_POWER,
+    CONF_BAUD_RATE,
     CONF_CURRENT,
-    CONF_DEVICE_CLASS,
     CONF_FREQUENCY,
     CONF_ID,
     CONF_NUMBER,
     CONF_POWER_FACTOR,
     CONF_REACTIVE_POWER,
+    CONF_RESTORE_MODE,
+    CONF_RX_PIN,
+    CONF_TX_PIN,
     CONF_VOLTAGE,
     CONF_ENERGY,
     DEVICE_CLASS_CURRENT,
@@ -24,11 +26,10 @@ from esphome.const import (
     DEVICE_CLASS_POWER,
     DEVICE_CLASS_POWER_FACTOR,
     DEVICE_CLASS_VOLTAGE,
-    ESP_PLATFORM_ESP8266,
+    PLATFORM_ESP8266,
     ICON_CURRENT_AC,
-    ICON_EMPTY,
     STATE_CLASS_MEASUREMENT,
-    UNIT_EMPTY,
+    STATE_CLASS_TOTAL_INCREASING,
     UNIT_HERTZ,
     UNIT_KILOWATT_HOURS,
     UNIT_VOLT,
@@ -38,7 +39,7 @@ from esphome.const import (
     UNIT_WATT,
 )
 
-ESP_PLATFORMS = [ESP_PLATFORM_ESP8266]
+ESP_PLATFORMS = [PLATFORM_ESP8266]
 
 CODEOWNERS = ["@dentra"]
 
@@ -61,6 +62,14 @@ zmai90v1_ns = cg.esphome_ns.namespace(component_name)
 ZMAi90v1 = zmai90v1_ns.class_(
     "ZMAi90v1", cg.PollingComponent, switch.Switch, uart.UARTDevice
 )
+ZMAi90v1RestoreMode = zmai90v1_ns.enum("ZMAi90v1RestoreMode")
+
+RESTORE_MODES = {
+    "ALWAYS_ON": ZMAi90v1RestoreMode.RESTORE_MODE_ALWAYS_ON,
+    "ALWAYS_OFF": ZMAi90v1RestoreMode.RESTORE_MODE_ALWAYS_OFF,
+    "RESTORE_DEFAULT_ON": ZMAi90v1RestoreMode.RESTORE_MODE_RESTORE_DEFAULT_ON,
+    "RESTORE_DEFAULT_OFF": ZMAi90v1RestoreMode.RESTORE_MODE_RESTORE_DEFAULT_OFF,
+}
 
 
 def valid_switch_pin(value):
@@ -80,66 +89,65 @@ def valid_button_pin(value):
 
 
 CONFIG_SCHEMA = (
-    binary_sensor.BINARY_SENSOR_SCHEMA.extend(
+    switch.SWITCH_SCHEMA.extend(
         {
             cv.GenerateID(): cv.declare_id(ZMAi90v1),
             cv.Optional(CONF_SWITCH_PIN, default=DEFAULT_SWITCH_PIN): valid_switch_pin,
             cv.Optional(CONF_BUTTON_PIN, default=DEFAULT_BUTTON_PIN): valid_button_pin,
-            cv.Optional(CONF_BUTTON): binary_sensor.BINARY_SENSOR_SCHEMA.extend(
+            cv.Optional(CONF_BUTTON): binary_sensor.binary_sensor_schema(
+                device_class=DEVICE_CLASS_EMPTY
+            ).extend(
                 {
-                    cv.Optional(
-                        CONF_DEVICE_CLASS, default=DEVICE_CLASS_EMPTY
-                    ): binary_sensor.device_class,
                     cv.Optional(CONF_BIND_TO_SWITCH, default=True): cv.boolean,
                 }
             ),
             cv.Optional(CONF_ENERGY): sensor.sensor_schema(
-                UNIT_KILOWATT_HOURS,
-                ICON_EMPTY,
-                2,
-                DEVICE_CLASS_ENERGY,
-                STATE_CLASS_MEASUREMENT,
+                unit_of_measurement=UNIT_KILOWATT_HOURS,
+                accuracy_decimals=2,
+                device_class=DEVICE_CLASS_ENERGY,
+                state_class=STATE_CLASS_TOTAL_INCREASING,
             ),
             cv.Optional(CONF_VOLTAGE): sensor.sensor_schema(
-                UNIT_VOLT, ICON_EMPTY, 2, DEVICE_CLASS_VOLTAGE
+                unit_of_measurement=UNIT_VOLT,
+                accuracy_decimals=2,
+                device_class=DEVICE_CLASS_VOLTAGE,
+                state_class=STATE_CLASS_MEASUREMENT,
             ),
             cv.Optional(CONF_CURRENT): sensor.sensor_schema(
-                UNIT_AMPERE,
-                ICON_EMPTY,
-                3,
-                DEVICE_CLASS_CURRENT,
-                STATE_CLASS_MEASUREMENT,
+                unit_of_measurement=UNIT_AMPERE,
+                accuracy_decimals=3,
+                device_class=DEVICE_CLASS_CURRENT,
+                state_class=STATE_CLASS_MEASUREMENT,
             ),
             cv.Optional(CONF_ACTIVE_POWER): sensor.sensor_schema(
-                UNIT_WATT, ICON_EMPTY, 2, DEVICE_CLASS_POWER, STATE_CLASS_MEASUREMENT
+                unit_of_measurement=UNIT_WATT,
+                accuracy_decimals=2,
+                device_class=DEVICE_CLASS_POWER,
+                state_class=STATE_CLASS_MEASUREMENT,
             ),
             cv.Optional(CONF_APPARENT_POWER): sensor.sensor_schema(
-                UNIT_VOLT_AMPS,
-                ICON_EMPTY,
-                2,
-                DEVICE_CLASS_POWER,
-                STATE_CLASS_MEASUREMENT,
+                unit_of_measurement=UNIT_VOLT_AMPS,
+                accuracy_decimals=2,
+                state_class=STATE_CLASS_MEASUREMENT,
             ),
             cv.Optional(CONF_REACTIVE_POWER): sensor.sensor_schema(
-                UNIT_VOLT_AMPS_REACTIVE,
-                ICON_EMPTY,
-                2,
-                DEVICE_CLASS_POWER,
-                STATE_CLASS_MEASUREMENT,
+                unit_of_measurement=UNIT_VOLT_AMPS_REACTIVE,
+                accuracy_decimals=2,
+                state_class=STATE_CLASS_MEASUREMENT,
             ),
             cv.Optional(CONF_FREQUENCY): sensor.sensor_schema(
-                UNIT_HERTZ,
-                ICON_CURRENT_AC,
-                2,
-                DEVICE_CLASS_EMPTY,
-                STATE_CLASS_MEASUREMENT,
+                unit_of_measurement=UNIT_HERTZ,
+                icon=ICON_CURRENT_AC,
+                accuracy_decimals=2,
+                state_class=STATE_CLASS_MEASUREMENT,
             ),
             cv.Optional(CONF_POWER_FACTOR): sensor.sensor_schema(
-                UNIT_EMPTY,
-                ICON_EMPTY,
-                1,
-                DEVICE_CLASS_POWER_FACTOR,
-                STATE_CLASS_MEASUREMENT,
+                accuracy_decimals=1,
+                device_class=DEVICE_CLASS_POWER_FACTOR,
+                state_class=STATE_CLASS_MEASUREMENT,
+            ),
+            cv.Optional(CONF_RESTORE_MODE, default="ALWAYS_ON"): cv.enum(
+                RESTORE_MODES, upper=True, space="_"
             ),
         }
     )
@@ -150,17 +158,17 @@ CONFIG_SCHEMA = (
 
 def valid_uart(conf):
     baud_rate = 9600
-    if conf[uart.CONF_BAUD_RATE] != baud_rate:
+    if conf[CONF_BAUD_RATE] != baud_rate:
         raise cv.Invalid(
             f"Component {component_name} required baud_rate {baud_rate} for the uart bus"
         )
     rx_pin = 3
-    if conf[uart.CONF_RX_PIN] != rx_pin:
+    if conf[CONF_RX_PIN][CONF_NUMBER] != rx_pin:
         raise cv.Invalid(
             f"Component {component_name} required rx_pin GPIO0{rx_pin} for the uart bus"
         )
     tx_pin = 1
-    if conf[uart.CONF_TX_PIN] != tx_pin:
+    if conf[CONF_TX_PIN][CONF_NUMBER] != tx_pin:
         raise cv.Invalid(
             f"Component {component_name} required tx_pin GPIO0{tx_pin} for the uart bus"
         )
@@ -212,9 +220,13 @@ def add_button_trigger_(id_: core.ID, switch_, button_):
 
 
 async def to_code(config):
+    """Code generation entry point"""
     var = cg.new_Pvariable(config[CONF_ID])
+    await switch.register_switch(var, config)
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
+
+    cg.add(var.set_restore_mode(config[CONF_RESTORE_MODE]))
 
     switch_pin = await cg.gpio_pin_expression(config[CONF_SWITCH_PIN])
     cg.add(var.set_switch_pin(switch_pin))
@@ -224,8 +236,7 @@ async def to_code(config):
 
     if CONF_BUTTON in config:
         conf = config[CONF_BUTTON]
-        button = cg.new_Pvariable(conf[CONF_ID])
-        await binary_sensor.register_binary_sensor(button, conf)
+        button = await binary_sensor.new_binary_sensor(conf)
         cg.add(var.set_button(button))
         if conf[CONF_BIND_TO_SWITCH]:
             add_button_trigger_(conf[CONF_ID], var, button)

@@ -28,9 +28,11 @@ miot:
     # String (Required), device MAC-address
     mac_address: "device-mac-address"
     # String, (Optional), device bind key
-    bindkey: "device-bin-key"
+    bindkey: "device-bind-key"
     # enable debug BLE messages, DO NOT USE IN PRODUCTION
     debug: true
+    then:
+      lambda: // empty action
 ```
 
 You can use automation to operate with [BLEObject](miot.h#L15) via `x` variable in lambda.
@@ -44,11 +46,11 @@ miot:
     # String (Required), device MAC-address.
     mac_address: "device-mac-address"
     # String, (Optional), device bind key
-    bindkey: "device-bin-key"
+    bindkey: "device-bind-key"
     # enable debug BLE messages, DO NOT USE IN PRODUCTION
     debug: true
     then:
-      lambda:
+      lambda: |-
         ESP_LOGW("main", "on_miot_advertise, miid: %d", x.id);
 ```
 

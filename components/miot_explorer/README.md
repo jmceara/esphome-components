@@ -16,10 +16,13 @@ text_sensor:
     # String (Required), device MAC-address.
     mac_address: "device-mac-address"
     # String, (Optional), device bind key
-    bindkey: "device-bin-key"
-    # String, (Optional), the name of sensor
-    name: "MyDevice"
+    bindkey: "device-bind-key"
+    # String, (Required), the name of sensor
+    name: "$name"
     # Sensor (Optional), Humidity, %
     battery_level:
-      name: "MyDevice Battery Level"
+      name: "$name Battery Level"
+    # Sensor (Optional), Battey Voltage, V
+    battery_voltage:
+      name: "$name Battery Voltage"
 ```

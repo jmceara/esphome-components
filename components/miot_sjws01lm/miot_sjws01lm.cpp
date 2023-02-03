@@ -1,12 +1,10 @@
-#ifdef ARDUINO_ARCH_ESP32
-
 #include "esphome/core/log.h"
 #include "miot_sjws01lm.h"
 
 namespace esphome {
 namespace miot_sjws01lm {
 
-static const char *TAG = "miot_sjws01lm";
+static const char *const TAG = "miot_sjws01lm";
 
 void MiotSJWS01LM::dump_config() {
   this->dump_config_(TAG);
@@ -34,5 +32,3 @@ bool MiotSJWS01LM::process_object_(const miot::BLEObject &obj) {
 
 }  // namespace miot_sjws01lm
 }  // namespace esphome
-
-#endif

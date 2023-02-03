@@ -76,7 +76,6 @@ class EnergyTariff : public Sensor,
     }
     return min <= x || x < max;
   }
-
 };  // class TariffSensor
 
 }  // namespace energy_tariffs

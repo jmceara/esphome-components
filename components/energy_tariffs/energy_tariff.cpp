@@ -1,13 +1,13 @@
 #include "esphome/core/log.h"
-
+#include "esphome/core/hal.h"
 #include "energy_tariff.h"
 #include "energy_tariffs.h"
 
 namespace esphome {
 namespace energy_tariffs {
 
-extern const char *const TAG;
-extern const char *const GAP;
+static const char *const TAG = "energy_tariff";
+static const char *const GAP = "  ";
 
 void EnergyTariff::dump_config() {
   LOG_SENSOR(GAP, "Energy Tariff", this);
@@ -20,7 +20,7 @@ void EnergyTariff::dump_config() {
 }
 
 void EnergyTariff::setup() {
-  this->rtc_ = global_preferences.make_preference<float>(this->get_object_id_hash());
+  this->rtc_ = global_preferences->make_preference<float>(this->get_object_id_hash());
 
   float loaded;
   if (this->rtc_.load(&loaded)) {
@@ -38,8 +38,8 @@ void EnergyTariff::setup() {
 
 void EnergyTariff::publish_state_and_save(float state) {
   ESP_LOGD(TAG, "'%s': Setting new state to %f", this->get_name().c_str(), state);
-  this->rtc_.save(&state);
   this->publish_state(state);
+  this->rtc_.save(&state);
 }
 
 }  // namespace energy_tariffs

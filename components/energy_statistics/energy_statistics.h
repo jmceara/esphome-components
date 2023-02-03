@@ -45,7 +45,7 @@ class EnergyStatistics : public Component {
   int energy_month_start_day_{1};
 
   struct energy_data_t {
-    uint16_t current_day_of_year_{0};
+    uint16_t current_day_of_year{0};
     float start_today{NAN};
     float start_yesterday{NAN};
     float start_week{NAN};
@@ -53,7 +53,7 @@ class EnergyStatistics : public Component {
   } energy_;
 
   void process_(float total);
-
+  void save_();
 };  // class EnergyStatistics
 
 }  // namespace energy_statistics

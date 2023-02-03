@@ -1,21 +1,28 @@
 import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome.core import TimePeriod
-from esphome.components import sensor, time
+from esphome.components import sensor, time, number
 from esphome import automation
 from esphome.const import (
+    CONF_ENTITY_CATEGORY,
+    CONF_ICON,
     CONF_ID,
+    CONF_MODE,
     CONF_TIME_ID,
     CONF_TOTAL,
     CONF_TRIGGER_ID,
     CONF_SERVICE,
+    CONF_UNIT_OF_MEASUREMENT,
     DEVICE_CLASS_ENERGY,
+    ENTITY_CATEGORY_CONFIG,
+    STATE_CLASS_TOTAL_INCREASING,
     UNIT_KILOWATT_HOURS,
 )
 
 CODEOWNERS = ["@dentra"]
 
 DEPENDENCIES = ["time"]
+AUTO_LOAD = ["number", "sensor"]
 
 # CONF_CURRENT_TARIFF = 'current_tariff'
 CONF_TARIFFS = "tariffs"
@@ -36,6 +43,7 @@ EnergyTariffs = energy_tariffs_ns.class_("EnergyTariffs", cg.Component)
 
 EnergyTariff = energy_tariffs_ns.class_("EnergyTariff", sensor.Sensor)
 EnergyTariffPtr = EnergyTariff.operator("ptr")
+TimeOffsetNumber = EnergyTariffs.class_("TimeOffsetNumber", number.Number)
 
 TariffChangeTrigger = energy_tariffs_ns.class_(
     "TariffChangeTrigger", automation.Trigger.template(sensor.SensorPtr)
@@ -105,10 +113,14 @@ def validate_tariffs(config):
 
 
 TARIFF_SCHEMA = sensor.sensor_schema(
-    UNIT_KILOWATT_HOURS, ICON_TARIFF, 2, DEVICE_CLASS_ENERGY
+    EnergyTariff,
+    unit_of_measurement=UNIT_KILOWATT_HOURS,
+    accuracy_decimals=2,
+    device_class=DEVICE_CLASS_ENERGY,
+    icon=ICON_TARIFF,
+    state_class=STATE_CLASS_TOTAL_INCREASING,
 ).extend(
     {
-        cv.GenerateID(): cv.declare_id(EnergyTariff),
         cv.Optional(CONF_TIME): cv.All(
             cv.ensure_list(validate_tariff_time), cv.Length(min=1, max=3)
         ),
@@ -122,8 +134,21 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(EnergyTariffs),
             cv.GenerateID(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
             cv.Required(CONF_TOTAL): cv.use_id(sensor.Sensor),
-            cv.Optional(CONF_TIME_OFFSET): cv.int_,
-            cv.Optional(CONF_TIME_OFFSET_SERVICE): cv.valid_name,
+            cv.Optional(CONF_TIME_OFFSET): number.NUMBER_SCHEMA.extend(
+                {
+                    cv.GenerateID(): cv.declare_id(TimeOffsetNumber),
+                    cv.Optional(CONF_ICON, default="mdi:clock-fast"): cv.icon,
+                    cv.Optional(
+                        CONF_UNIT_OF_MEASUREMENT, default="s"
+                    ): cv.string_strict,
+                    cv.Optional(CONF_MODE, default="BOX"): cv.enum(
+                        number.NUMBER_MODES, upper=True
+                    ),
+                    cv.Optional(
+                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
+                    ): cv.entity_category,
+                }
+            ),
             cv.Optional(CONF_TARIFFS): cv.All(
                 cv.ensure_list(TARIFF_SCHEMA), cv.Length(min=1, max=4)
             ),
@@ -146,6 +171,7 @@ CONFIG_SCHEMA = cv.All(
 
 
 async def setup_sensor(config, key, setter):
+    """setting up sensor"""
     if key not in config:
         return None
     var = await sensor.new_sensor(config[key])
@@ -154,6 +180,7 @@ async def setup_sensor(config, key, setter):
 
 
 async def setup_input(config, key, setter):
+    """setting up input"""
     if key not in config:
         return None
     var = await cg.get_variable(config[key])
@@ -163,6 +190,7 @@ async def setup_input(config, key, setter):
 
 # code generation entry point
 async def to_code(config):
+    """Code generation entry point"""
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
@@ -172,14 +200,19 @@ async def to_code(config):
     await setup_input(config, CONF_TOTAL, var.set_total)
 
     if CONF_TIME_OFFSET in config:
-        cg.add(var.set_time_offset(config[CONF_TIME_OFFSET]))
-    if CONF_TIME_OFFSET_SERVICE in config:
-        cg.add(var.set_time_offset_service(config[CONF_TIME_OFFSET_SERVICE]))
+        numb = await number.new_number(
+            config[CONF_TIME_OFFSET], min_value=-3600, max_value=3600, step=1
+        )
+        cg.add(numb.set_parent(var))
+        cg.add(var.set_time_offset(numb))
+    # if CONF_TIME_OFFSET in config:
+    #     cg.add(var.set_time_offset(config[CONF_TIME_OFFSET]))
+    # if CONF_TIME_OFFSET_SERVICE in config:
+    #     cg.add(var.set_time_offset_service(config[CONF_TIME_OFFSET_SERVICE]))
 
     # exposed sensors
     for conf in config.get(CONF_TARIFFS, []):
-        sens = cg.new_Pvariable(conf[CONF_ID])
-        await sensor.register_sensor(sens, conf)
+        sens = await sensor.new_sensor(conf)
         for tm in conf.get(CONF_TIME, []):
             parts = tm.split("-")
             t = [time_period(parts[0]), time_period(parts[1])]

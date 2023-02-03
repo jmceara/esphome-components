@@ -3,9 +3,11 @@
   "build": {
     "args": {
       // ESPHome version
-      "esphome_version": "2021.9.0",
+      "esphome_version": "2022.12.3",
       // additional APT dependicies
-      "apt_deps": "bash-completion less"
+      "apt_deps": "bash-completion less",
+      // additional PIP dependicies
+      "pip_deps": ""
     }
   },
   "runArgs": [
@@ -41,12 +43,14 @@
       "**/*.pyc": {
         "when": "$(basename).py"
       },
-      "**/__pycache__": true
+      "**/__pycache__": true,
+      "**/.esphome": false,
+      ".pio": true
     },
     "files.associations": {
       "**/.vscode/*.json": "jsonc"
     },
-    "C_Cpp.clang_format_path": "/usr/bin/clang-format-11",
+    "C_Cpp.clang_format_path": "/usr/bin/clang-format-11"
   },
   // Add the IDs of extensions you want installed when the container is created.
   "extensions": [
@@ -54,6 +58,7 @@
     "ms-vscode.cpptools",
     // python
     "ms-python.python",
+    "ms-python.vscode-pylance",
     "visualstudioexptteam.vscodeintellicode",
     // yaml
     "redhat.vscode-yaml",
@@ -61,6 +66,8 @@
     "esphome.esphome-vscode",
     // editorconfig
     "editorconfig.editorconfig",
+    // fixme and todo tree
+    "Gruntfuggly.todo-tree"
   ],
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   // "forwardPorts": [],
@@ -72,4 +79,11 @@
   ],
   // Comment out this line to run as root instead.
   "remoteUser": "vscode",
+  "mounts": [
+    "source=vscode-${containerWorkspaceFolderBasename},target=${containerWorkspaceFolder}/.esphome,type=volume",
+    "source=vscode-${containerWorkspaceFolderBasename},target=${containerWorkspaceFolder}/.pio,type=volume",
+    "source=vscode-${containerWorkspaceFolderBasename},target=/esphome/.temp,type=volume",
+    "source=vscode-${containerWorkspaceFolderBasename},target=${containerWorkspaceFolder}/config/.esphome,type=volume",
+    "source=vscode-${containerWorkspaceFolderBasename},target=${containerWorkspaceFolder}/lib/.esphome,type=volume"
+  ]
 }

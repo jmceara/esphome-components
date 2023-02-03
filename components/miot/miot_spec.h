@@ -1,5 +1,5 @@
 #pragma once
-#ifdef ARDUINO_ARCH_ESP32
+
 #include <functional>
 #include "esphome/core/optional.h"
 
@@ -33,10 +33,16 @@ enum MIID : uint16_t {
   // Simple pairing event.
   //
   // uint16_t object_id - Object ID to be paired, such as key event (0x1001)
-  MIID_SIMPLE_PAIRING_EVENT = 0x0002,
+  MIID_PAIRING_EVENT = 0x0002,
 
-  // Close to event.
-  MIID_CLOSE_TO_EVENT = 0x0003,
+  // Motion/Close to event.
+  //
+  //! uint8_t has_motion
+  //!
+  //! Has motion:
+  //!   0x00 - no motion
+  //!   0x01 - has motion
+  MIID_MOTION_EVENT = 0x0003,
 
   // Away from/Stay away from event.
   MIID_AWAY_FROM_EVENT = 0x0004,
@@ -219,8 +225,8 @@ enum MIID : uint16_t {
   //
   // The unit of light intensity is Lux, the value range is 0-120000.
   //
-  // Note: This event is only for human sensors with both light sensors,
-  //       and separate human sensors can use MIID_CLOSE_TO_EVENT
+  // Note: This event is only for human sensors with lighting sensors at the same
+  //       time, and individual human sensors can use MIID_MOTION_EVENT
   MIID_MOTION_WITH_LIGHT_EVENT = 0x000F,
 
   // Toothbrush event.
@@ -263,15 +269,20 @@ enum MIID : uint16_t {
 
   // Button event.
   //
-  // uint16_t index;
+  // uint8_t index;
+  // int8_t value;
   // uint8_t type;
   //
   // Index: Button number, value range 0~9
+  // Value: Dimmer value
   // Type:
   //   0x00: click
   //   0x01: double-click
   //   0x02: long press
-  //   0x03: triple click
+  //   0x03: triple click / knob rotation
+  //   0x04: click the key to release / rotate dimmer
+  //   0x05: short press
+  //   0x06: long press
   MIID_BUTTON_EVENT = 0x1001,
 
   /// General attributes.
@@ -292,10 +303,6 @@ enum MIID : uint16_t {
   // rssi: Signal strength value.
   MIID_RSSI = 0x1003,
 
-  //! Motion (not checked, borrowed from original xiaomi.cpp)
-  //! motion detection, 1 byte, 8-bit unsigned integer
-  MIID_MOTION = MIID_RSSI,
-
   // Temperature.
   //
   // int16_t temperature;
@@ -304,6 +311,9 @@ enum MIID : uint16_t {
   MIID_TEMPERATURE = 0x1004,
 
   //! Water boil.
+  //!
+  //! uint8_t power;
+  //! uint8_t temperature;
   MIID_WATER_BOIL = 0x1005,
 
   // Humidity.
@@ -596,7 +606,49 @@ enum MIID : uint16_t {
   //  1: End of brushing
   // Timestamp: UTC time
   // Score (optional): This parameter can be added to the end of brushing event: the score of this brushing, 0~100
-  MIID_XIAOBEI_TOOTHBRUSH_EVENT = 0x3003
+  MIID_XIAOBEI_TOOTHBRUSH_EVENT = 0x3003,
+
+  // MiaoMiaoce miaomiaoce.sensor_ht.t6 Battery.
+  //
+  // uint8_t level;
+  //
+  // Battery: range [0,100], accuracy 1, %
+  //
+  // https://miot-spec.org/miot-spec-v2/spec/property?type=urn:miot-spec-v2:property:battery-level:00000014
+  MIID_MIAOMIAOCE_BATTERY_1003 = 0x4803,
+
+  // MiaoMiaoce Low Battery.
+  MIID_MIAOMIAOCE_LOW_BATTERY = 0x4A01,
+
+  // MiaoMiaoce miaomiaoce.sensor_ht.t6 Temperature.
+  //
+  // float temperature;
+  //
+  // Temperature, range [-30, 100], accuracy 0.1, C
+  //
+  // https://home.miot-spec.com/spec/miaomiaoce.sensor_ht.t9
+  // https://home.miot-spec.com/spec/miaomiaoce.sensor_ht.o2
+  // https://home.miot-spec.com/spec/miaomiaoce.sensor_ht.t6
+  MIID_MIAOMIAOCE_TEMPERATURE_1001 = 0x4C01,
+
+  // MiaoMiaoce miaomiaoce.sensor_ht.t6 Humidity.
+  //
+  // float humidity;
+  //
+  // Relative Humidity, range [0, 100], accuracy 0.1, %
+  //
+  // https://home.miot-spec.com/spec/miaomiaoce.sensor_ht.t6
+  MIID_MIAOMIAOCE_HUMIDITY_1008 = 0x4C08,
+
+  // MiaoMiaoce miaomiaoce.sensor_ht.o2 humidity.
+  //
+  // uint8_t humidity;
+  //
+  // Relative Humidity, range [0, 100], accuracy 1.0, %
+  //
+  // https://home.miot-spec.com/spec/miaomiaoce.sensor_ht.t9
+  // https://home.miot-spec.com/spec/miaomiaoce.sensor_ht.o2
+  MIID_MIAOMIAOCE_HUMIDITY_1002 = 0x4C02,
 };
 
 // Frame Control.
@@ -735,4 +787,3 @@ struct RawBLEObject {
 
 }  // namespace miot
 }  // namespace esphome
-#endif

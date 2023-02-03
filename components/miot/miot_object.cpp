@@ -1,4 +1,4 @@
-#ifdef ARDUINO_ARCH_ESP32
+#include "inttypes.h"
 #include "esphome/core/log.h"
 #include "miot_object.h"
 
@@ -84,7 +84,7 @@ optional<float> BLEObject::get_temperature() const {
   CHECK_MIID(MIID_TEMPERATURE);
   const auto temperature = this->get_int16();
   if (!temperature.has_value()) {
-    return temperature;
+    return {};
   }
   const float res = *temperature * 0.1f;
   ESP_LOGD(TAG, "Temperature %.1f °C", res);
@@ -95,56 +95,95 @@ optional<float> BLEObject::get_humidity() const {
   CHECK_MIID(MIID_HUMIDITY);
   const auto humidity = this->get_uint16();
   if (!humidity.has_value()) {
-    return humidity;
+    return {};
   }
   const float res = *humidity * 0.1f;
   ESP_LOGD(TAG, "Humidity %.1f %%", res);
   return res;
 }
 
-optional<const TemperatureHumidity> BLEObject::get_temperature_humidity() const {
+const TemperatureHumidity *BLEObject::get_temperature_humidity() const {
   CHECK_MIID(MIID_TEMPERATURE_HUMIDITY);
-  struct _TemperatureHumidity {
-    uint16_t temperature;
-    uint16_t humidity;
-  };
-  const auto typed = this->get_typed<_TemperatureHumidity>();
-  if (!typed.has_value()) {
-    return {};
+  const auto th = this->get_typed<TemperatureHumidity>();
+  if (th != nullptr) {
+    ESP_LOGD(TAG, "Temperature %.1f °C", th->get_temperature());
+    ESP_LOGD(TAG, "Humidity %.1f %%", th->get_humidity());
   }
-  TemperatureHumidity res;
-  res.temperature = (*typed)->temperature * 0.1f;
-  ESP_LOGD(TAG, "Temperature %.1f °C", res.temperature);
-  res.humidity = (*typed)->humidity * 0.1f;
-  ESP_LOGD(TAG, "Humidity %.1f %%", res.humidity);
-  return res;
+  return th;
 }
 
-optional<const ButtonEvent> BLEObject::get_button_event() const {
+void ButtonEvent::str(char *tmp, const ButtonEvent &button_event) {
+  switch (button_event.type) {
+    case ButtonEvent::BUTTON_CLICK:
+      sprintf(tmp, "Button click: %u", button_event.button.index);
+      break;
+    case ButtonEvent::BUTTON_DOUBLE_CLICK:
+      sprintf(tmp, "Button double click: %u", button_event.button.index);
+      break;
+    case ButtonEvent::BUTTON_LONG_PRESS:
+      sprintf(tmp, "Button long press: %u", button_event.button.index);
+      break;
+    case ButtonEvent::KNOB: {
+      uint8_t value = button_event.knob.short_press();
+      if (value != 0) {
+        sprintf(tmp, "Rotating knob short press, value: %" PRIu8, value);
+        break;
+      }
+      value = button_event.knob.long_press();
+      if (value != 0) {
+        sprintf(tmp, "Rotating knob long press, value: %" PRIu8, value);
+        break;
+      }
+      sprintf(tmp, "Rotating knob unknown event: index=%" PRIu8 ", value:=%" PRIu8, button_event.knob.index,
+              button_event.knob.value);
+      break;
+    }
+    case ButtonEvent::DIMMER: {
+      uint8_t value = button_event.dimmer.left();
+      if (value != 0) {
+        sprintf(tmp, "Dimmer rotate left value: %" PRIu8, value);
+        break;
+      }
+      value = button_event.dimmer.right();
+      if (value != 0) {
+        sprintf(tmp, "Dimmer rotate right value: %" PRIu8, value);
+        break;
+      }
+      value = button_event.dimmer.left_pressed();
+      if (value != 0) {
+        sprintf(tmp, "Dimmer rotate left (pressed) value: %" PRIu8, value);
+        break;
+      }
+      value = button_event.dimmer.right_pressed();
+      if (value != 0) {
+        sprintf(tmp, "Dimmer rotate right (pressed) value: %" PRIu8, value);
+        break;
+      }
+      sprintf(tmp, "Dimmer unknown event: index=%" PRIi8 ", value:=%" PRIi8, button_event.dimmer.index,
+              button_event.dimmer.value);
+      break;
+    }
+    default:
+      sprintf(tmp, "Button unknown event %02" PRIx8 ": %04X", button_event.type, button_event.button.index);
+      break;
+  }
+}
+
+void ButtonEvent::dump(const char *TAG, const ButtonEvent &button_event) {
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
+  char tmp[64];
+  ButtonEvent::str(tmp, button_event);
+  ESP_LOGD(TAG, tmp);
+#endif
+}
+
+const ButtonEvent *BLEObject::get_button_event() const {
   CHECK_MIID(MIID_BUTTON_EVENT);
   const auto button_event = this->get_typed<ButtonEvent>();
-  if (!button_event.has_value()) {
-    return {};
+  if (button_event != nullptr) {
+    ButtonEvent::dump(TAG, *button_event);
   }
-  const auto &res = *(*button_event);
-  switch (res.type) {
-    case ButtonEvent::CLICK:
-      ESP_LOGD(TAG, "Button click: %u", res.index);
-      break;
-    case ButtonEvent::DOUBLE_CLICK:
-      ESP_LOGD(TAG, "Button double click: %u", res.index);
-      break;
-    case ButtonEvent::TRIPLE_CLICK:
-      ESP_LOGD(TAG, "Button triple click: %u", res.index);
-      break;
-    case ButtonEvent::LONG_PRESS:
-      ESP_LOGD(TAG, "Button long press: %u", res.index);
-      break;
-    default:
-      ESP_LOGD(TAG, "Button unknown event %02" PRIx8 ": %u", res.type, res.index);
-      break;
-  }
-  return res;
+  return button_event;
 }
 
 optional<float> BLEObject::get_illuminance() const {
@@ -156,6 +195,66 @@ optional<float> BLEObject::get_illuminance() const {
   return *illuminance;
 }
 
+optional<MIID> BLEObject::get_pairing_object() const {
+  CHECK_MIID(MIID_PAIRING_EVENT);
+  const auto event = this->get_uint16();
+  if (event.has_value()) {
+    ESP_LOGD(TAG, "Paring object %04X", *event);
+  }
+  return static_cast<MIID>(*event);
+}
+
+const WaterBoil *BLEObject::get_water_boil() const {
+  CHECK_MIID(MIID_WATER_BOIL);
+  const auto water_boil = this->get_typed<WaterBoil>();
+  if (water_boil != nullptr) {
+    ESP_LOGD(TAG, "Water Boil Power %s", ONOFF(water_boil->get_power()));
+    ESP_LOGD(TAG, "Water Boil Temperature %.1f °C", water_boil->get_temperature());
+  }
+  return water_boil;
+}
+
+optional<uint8_t> BLEObject::get_miaomiaoce_battery_level_1003() const {
+  CHECK_MIID(MIID_MIAOMIAOCE_BATTERY_1003);
+  auto battery_level = this->get_uint8();
+  if (battery_level.has_value()) {
+    ESP_LOGD(TAG, "Battery level: %" PRIu8 " %%", *battery_level);
+  }
+  return battery_level;
+}
+
+optional<float> BLEObject::get_miaomiaoce_temperature_1001() const {
+  CHECK_MIID(MIID_MIAOMIAOCE_TEMPERATURE_1001);
+  const auto temperature = this->get_float();
+  if (!temperature.has_value()) {
+    return {};
+  }
+  const float res = *temperature;
+  ESP_LOGD(TAG, "Temperature %.1f °C", res);
+  return res;
+}
+
+optional<float> BLEObject::get_miaomiaoce_humidity_1008() const {
+  CHECK_MIID(MIID_MIAOMIAOCE_HUMIDITY_1008);
+  const auto humidity = this->get_float();
+  if (!humidity.has_value()) {
+    return {};
+  }
+  const float res = *humidity;
+  ESP_LOGD(TAG, "Humidity %.1f %%", res);
+  return res;
+}
+
+optional<float> BLEObject::get_miaomiaoce_humidity_1002() const {
+  CHECK_MIID(MIID_MIAOMIAOCE_HUMIDITY_1002);
+  const auto humidity = this->get_uint8();
+  if (!humidity.has_value()) {
+    return {};
+  }
+  const float res = *humidity;
+  ESP_LOGD(TAG, "Humidity %.1f %%", res);
+  return res;
+}
+
 }  // namespace miot
 }  // namespace esphome
-#endif
