@@ -26,8 +26,7 @@ void EnergyTariffs::setup() {
   }
 
   if (this->time_offset_) {
-    const bool save_to_flash = true;
-    this->rtc_ = global_preferences->make_preference<float>(fnv1_hash(TAG), save_to_flash);
+    this->rtc_ = global_preferences->make_preference<float>(fnv1_hash(TAG));
     float loaded;
     if (this->rtc_.load(&loaded)) {
       auto call = this->time_offset_->make_call();
@@ -49,7 +48,7 @@ void EnergyTariffs::loop() {
   if (this->time_offset_ && this->time_offset_->has_state()) {
     // sync time with mains
     time_t ts = time.timestamp + this->time_offset_->state;
-    time = time::ESPTime::from_epoch_local(ts);
+    time = ESPTime::from_epoch_local(ts);
   }
 
   auto ct = this->get_tariff_(time);
@@ -88,7 +87,7 @@ void EnergyTariffs::process_(float total) {
   }
 }
 
-EnergyTariff *EnergyTariffs::get_tariff_(const time::ESPTime &time) const {
+EnergyTariff *EnergyTariffs::get_tariff_(const ESPTime &time) const {
   EnergyTariff *def{};
   for (auto t : this->tariffs_) {
     if (t->is_default()) {

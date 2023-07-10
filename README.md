@@ -3,20 +3,24 @@
 [![License][license-shield]][license]
 [![ESPHome release][esphome-release-shield]][esphome-release]
 [![Open in Visual Studio Code][open-in-vscode-shield]][open-in-vscode]
-[![Support author][donate-me-shield]][donate-me]
 [![PayPal.Me][paypal-me-shield]][paypal-me]
+[![Support author][donate-tinkoff-shield]][donate-tinkoff]
+[![Support author][donate-boosty-shield]][donate-boosty]
 
 [license-shield]: https://img.shields.io/static/v1?label=License&message=MIT&color=orange&logo=license
 [license]: https://opensource.org/licenses/MIT
 
-[esphome-release-shield]: https://img.shields.io/static/v1?label=ESPHome&message=2022.9.0&color=green&logo=esphome
+[esphome-release-shield]: https://img.shields.io/static/v1?label=ESPHome&message=2023.6&color=green&logo=esphome
 [esphome-release]: https://GitHub.com/esphome/esphome/releases/
 
 [open-in-vscode-shield]: https://img.shields.io/static/v1?label=+&message=Open+in+VSCode&color=blue&logo=visualstudiocode
 [open-in-vscode]: https://open.vscode.dev/dentra/esphome-components
 
-[donate-me-shield]: https://img.shields.io/static/v1?label=+&message=Donate
-[donate-me]: https://www.tinkoff.ru/cf/3dZPaLYDBAI
+[donate-tinkoff-shield]: https://img.shields.io/static/v1?label=Donate&message=Tinkoff&color=yellow
+[donate-tinkoff]: https://www.tinkoff.ru/cf/3dZPaLYDBAI
+
+[donate-boosty-shield]: https://img.shields.io/static/v1?label=Donate&message=Boosty&color=red
+[donate-boosty]: https://boosty.to/dentra
 
 [paypal-me-shield]: https://img.shields.io/static/v1?label=+&message=PayPal.Me&logo=paypal
 [paypal-me]: https://paypal.me/dentra0
@@ -70,6 +74,7 @@ At this moment there are list of supported device:
  * [Yeelight Smart Bluetooth Wireless Dimmer Wall Light Switch Remote Control (YLKG08YL/YLKG07YL)](components/miot_ylkg0xyl/)
  * [EraClean Refrigerator Odor Eliminator Max (CWBS-01)](components/miot_cwbs01/)
  * [Mijia Smart Temperature and Humidity Monitor 3 (MJWSD05MMC)](components/miot_th/)
+ * [Universal Xiaomi Toothbrush](components/miot_toothbrush/)
 
 And growing...
 
